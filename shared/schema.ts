@@ -20,6 +20,10 @@ const unit = z.number().min(-1).max(1),
 export const ProfileSchema = z
   .object({
     name: Name,
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional(),
     party: z.enum(["Democratic", "Republican", "Independent"]),
     label: z.string().max(60).default(""),
     bio: z.string().max(1200),

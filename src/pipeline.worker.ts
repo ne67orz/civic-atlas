@@ -69,6 +69,7 @@ self.onmessage = async ({ data }) => {
               );
         profiles.push({
           ...profile,
+          color: item.color,
           label: profile.label || "",
           name: item.name,
           party: item.party,

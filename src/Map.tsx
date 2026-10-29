@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { feature, mesh } from "topojson-client";
 import { geoAlbersUsa, geoPath } from "d3-geo";
-import { COLORS, STATES } from "../shared/states";
+import { STATES } from "../shared/states";
 import type { County, Profile, Result, VoteResult } from "../shared/schema";
+import { candidateColor, Swatch } from "./appearance";
 export default function ElectionMap({
   result,
   candidates,
@@ -114,7 +115,9 @@ export default function ElectionMap({
             {geo.map((f: any) => {
               const id = String(f.id).padStart(layer === "county" ? 5 : 2, "0"),
                 row = getRow(id),
-                color = row ? COLORS[row.winner] : "#dce4df";
+                color = row
+                  ? candidateColor(candidates[row.winner], row.winner)
+                  : "#dce4df";
               const title =
                 label(id) +
                 (row
@@ -168,7 +171,7 @@ export default function ElectionMap({
       <div className="legend">
         {candidates.map((c, i) => (
           <span key={i}>
-            <b className={"dot c" + i} />
+            <Swatch color={candidateColor(c, i)} />
             {String.fromCharCode(65 + i)} · {c.name}
           </span>
         ))}

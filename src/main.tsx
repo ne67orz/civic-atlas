@@ -8,8 +8,6 @@ import {
   Globe2,
   SlidersHorizontal,
   KeyRound,
-  Sun,
-  Moon,
   Download,
   Link,
   Play,
@@ -30,7 +28,7 @@ import {
   type Result,
   type VoteResult,
 } from "../shared/schema";
-import { COLORS, DEFAULT_ENV, STATES } from "../shared/states";
+import { DEFAULT_ENV, STATES } from "../shared/states";
 import { hash } from "../shared/engine";
 import {
   authorize,
@@ -43,6 +41,14 @@ import {
 import { decode, shareUrl } from "./share";
 import { token } from "./turnstile";
 import "./style.css";
+import {
+  candidateColor,
+  Swatch,
+  initialTheme,
+  applyTheme,
+  THEMES,
+  type Theme,
+} from "./appearance";
 const sample = (name: string, party: Profile["party"]): Profile => ({
   name,
   party,
@@ -83,7 +89,7 @@ function App() {
     [selected, setSelected] = useState<VoteResult | null>(null),
     [sort, setSort] = useState("margin"),
     [counties, setCounties] = useState<County[]>([]),
-    [dark, setDark] = useState(false),
+    [theme, setTheme] = useState<Theme>(initialTheme),
     [calls, setCalls] = useState(0),
     [newSeed, setNewSeed] = useState(0),
     [live, setLive] = useState(false);
@@ -91,8 +97,17 @@ function App() {
     bot = useRef<HTMLDivElement>(null),
     importFile = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-  }, [dark]);
+    const system = matchMedia("(prefers-color-scheme: dark)");
+    const update = () => applyTheme(theme, system.matches);
+    update();
+    try {
+      localStorage.setItem("atlas-theme", theme);
+    } catch {
+      /* Theme works without storage. */
+    }
+    system.addEventListener("change", update);
+    return () => system.removeEventListener("change", update);
+  }, [theme]);
   useEffect(() => {
     const w = new Worker(new URL("./pipeline.worker.ts", import.meta.url), {
       type: "module",
@@ -182,6 +197,19 @@ function App() {
   function update(i: number, patch: Partial<Profile>) {
     setCandidates((c) => c.map((x, j) => (i === j ? { ...x, ...patch } : x)));
   }
+  function updateColor(i: number, color: string) {
+    update(i, { color });
+    setInput((current) =>
+      current
+        ? {
+            ...current,
+            candidates: current.candidates.map((c) =>
+              c.name === candidates[i].name ? { ...c, color } : c,
+            ),
+          }
+        : current,
+    );
+  }
   async function generate() {
     try {
       candidates.forEach((c) => Name.parse(c.name));
@@ -235,7 +263,11 @@ function App() {
           candidates,
           environment: env,
           seed: hash(
-            JSON.stringify(candidates) + JSON.stringify(env) + newSeed,
+            JSON.stringify(
+              candidates.map(({ color, ...candidate }) => candidate),
+            ) +
+              JSON.stringify(env) +
+              newSeed,
           ),
           narrative: "",
         },
@@ -330,13 +362,20 @@ function App() {
             Methodology
           </button>
         </nav>
-        <button
-          className="icon-button"
-          aria-label={dark ? "Use light theme" : "Use dark theme"}
-          onClick={() => setDark(!dark)}
-        >
-          {dark ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        <label className="theme-picker">
+          <span>Theme</span>
+          <select
+            aria-label="Theme"
+            value={theme}
+            onChange={(e) => setTheme(e.target.value as Theme)}
+          >
+            {THEMES.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </header>
       <main>
         <section className="intro">
@@ -532,10 +571,29 @@ function App() {
                 {candidates.map((c, i) => (
                   <div className="candidate" key={i}>
                     <div className="candidate-top">
-                      <span className={"candidate-letter c" + i}>
-                        {String.fromCharCode(65 + i)}
+                      <span className="candidate-letter">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <rect
+                            width="24"
+                            height="24"
+                            rx="4"
+                            fill={candidateColor(c, i)}
+                          />
+                        </svg>
+                        <span>{String.fromCharCode(65 + i)}</span>
                       </span>
                       <strong>Candidate {i + 1}</strong>
+                      <label className="color-picker">
+                        <input
+                          type="color"
+                          aria-label={"Color for " + c.name}
+                          value={candidateColor(c, i)}
+                          disabled={!!busy}
+                          onInput={(e) => updateColor(i, e.currentTarget.value)}
+                          onChange={(e) => updateColor(i, e.target.value)}
+                        />
+                        <span>Color</span>
+                      </label>
                       {candidates.length > 2 && (
                         <button
                           aria-label={"Remove " + c.name}
@@ -718,7 +776,7 @@ function App() {
                   {displayCandidates.slice(0, 2).map((c, i) => (
                     <div key={i}>
                       <span>
-                        <b className={"dot c" + i} />
+                        <Swatch color={candidateColor(c, i)} />
                         {c.name}
                       </span>
                       <strong>
@@ -744,7 +802,7 @@ function App() {
                           y="0"
                           width={ev}
                           height="20"
-                          fill={COLORS[i]}
+                          fill={candidateColor(displayCandidates[i], i)}
                         />
                       ))}
                     <path
@@ -927,7 +985,7 @@ function App() {
                       {displayCandidates.map((c, i) => (
                         <div className="probability" key={i}>
                           <span>
-                            <b className={"dot c" + i} />
+                            <Swatch color={candidateColor(c, i)} />
                             {c.name}
                           </span>
                           <strong>
@@ -942,7 +1000,7 @@ function App() {
                             <rect
                               width={result.probabilities[i] * 100}
                               height="4"
-                              fill={COLORS[i]}
+                              fill={candidateColor(displayCandidates[i], i)}
                             />
                           </svg>
                           <small>
@@ -1018,7 +1076,7 @@ function App() {
                       </div>
                       {displayCandidates.map((c, i) => (
                         <p key={i}>
-                          <b className={"dot c" + i} />
+                          <Swatch color={candidateColor(c, i)} />
                           {c.name}: {selected.votes[i].toLocaleString()} votes (
                           {(
                             (selected.votes[i] / selected.turnout) *
@@ -1075,7 +1133,12 @@ function App() {
                                 </button>
                               </td>
                               <td>
-                                <b className={"dot c" + s.winner} />
+                                <Swatch
+                                  color={candidateColor(
+                                    displayCandidates[s.winner],
+                                    s.winner,
+                                  )}
+                                />
                                 {displayCandidates[s.winner].name}
                               </td>
                               <td>

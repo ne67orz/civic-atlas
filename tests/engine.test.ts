@@ -124,3 +124,17 @@ describe("Election mechanics", () => {
     );
   });
 });
+it("preserves custom colors in shared scenarios without changing votes", async () => {
+  const colored = InputSchema.parse({
+    ...input,
+    candidates: input.candidates.map((c) => ({ ...c, color: "#ab34cd" })),
+  });
+  expect(await decode(await encode(colored))).toEqual(colored);
+  expect(simulate(colored, counties, districts, 2)).toEqual(
+    simulate(input, counties, districts, 2),
+  );
+  expect(
+    ProfileSchema.safeParse({ ...input.candidates[0], color: "url(example)" })
+      .success,
+  ).toBe(false);
+});

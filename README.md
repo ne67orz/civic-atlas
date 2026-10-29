@@ -28,7 +28,7 @@ npm run benchmark
 
 ## What is implemented
 
-- Original Civic Atlas branding, responsive light/dark interface, 2–6 editable profiles, source display, environment overrides, progress, and a persistent disclaimer.
+- Original Civic Atlas branding, responsive theme selector with Light, Discord, Dark (black), OLED (true black), Midnight teal, Sepia, and System; the preference is saved and System follows OS changes, custom candidate colors carried through maps/charts/shared results, 2–6 editable profiles, source display, environment overrides, progress, and a persistent disclaimer.
 - Real us-atlas county/state geometry with winner/margin views, zoom controls, pointer tooltips, state keyboard controls, and an equivalent sortable state table. Selection exposes shares and modeled votes.
 - 2016/2020/2024 returns, ACS education/race/income/age context, integer county votes rolled into 51 state/DC results, 538 electors, Maine/Nebraska splits, contingent outcomes and recount-range labels.
 - Seeded browser worker, correlated uncertainty, multinomial choice, 1,000 Monte Carlo trials (250 on low-concurrency devices), state odds and tipping-point electoral unit. No simulation work on the server.

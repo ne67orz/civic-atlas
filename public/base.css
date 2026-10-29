@@ -313,7 +313,9 @@ h3 {
 .c5 {
   background: #a39334;
 }
-input:not([type="checkbox"]):not([type="range"]):not([type="file"]),
+input:not([type="checkbox"]):not([type="range"]):not([type="file"]):not(
+    [type="color"]
+  ),
 select,
 textarea {
   width: 100%;
@@ -847,7 +849,12 @@ progress {
   margin-top: 10px;
   accent-color: var(--accent);
 }
-[data-theme="dark"] {
+:is(
+  [data-theme="dark"],
+  [data-theme="discord"],
+  [data-theme="oled"],
+  [data-theme="midnight"]
+) {
   --bg: #14292c;
   --card: #1b3336;
   --ink: #e1e8df;
@@ -858,13 +865,32 @@ progress {
   background: var(--bg);
   color: var(--ink);
 }
-[data-theme="dark"] .notice,
-[data-theme="dark"] .run-strip {
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"]
+  )
+  .notice,
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"]
+  )
+  .run-strip {
   background: #293c35;
   color: #d6dfc9;
   border-color: #49624b;
 }
-[data-theme="dark"] .run-strip span {
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"]
+  )
+  .run-strip
+  span {
   color: #a7b8af;
 }
 @media (min-width: 1500px) {
@@ -1050,4 +1076,284 @@ progress {
 }
 .map-scroll svg.zoom30 {
   width: 300%;
+}
+/* Candidate colors use SVG presentation attributes to preserve the strict CSP. */
+.candidate-letter {
+  position: relative;
+  background: transparent;
+}
+.candidate-letter > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.candidate-letter > span {
+  position: relative;
+  text-shadow:
+    0 1px 3px #000,
+    0 0 2px #000;
+}
+.color-picker {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.color-picker input[type="color"] {
+  width: 30px;
+  height: 27px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+  background: var(--card);
+}
+.candidate-top .color-picker + button {
+  margin-left: 0;
+}
+.theme-toggle {
+  white-space: nowrap;
+}
+:root {
+  color-scheme: light;
+}
+:is(
+  [data-theme="dark"],
+  [data-theme="discord"],
+  [data-theme="oled"],
+  [data-theme="midnight"]
+) {
+  color-scheme: dark;
+}
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"]
+  )
+  h1
+  em {
+  color: #91b9a4;
+}
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"]
+  )
+  .intro-note {
+  color: var(--ink);
+}
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"]
+  )
+  a {
+  color: #9dd4c5;
+}
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"]
+  )
+  .brand {
+  color: var(--ink);
+}
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"]
+  )
+  .map-scroll
+  path[role="button"] {
+  stroke: #31474a;
+}
+@media (max-width: 720px) {
+  .theme-toggle {
+    padding: 8px;
+    font-size: 10px;
+    gap: 4px;
+  }
+  header {
+    gap: 8px;
+  }
+  nav {
+    gap: 8px;
+  }
+}
+@media (max-width: 420px) {
+  .brand small {
+    letter-spacing: 1px;
+    font-size: 7px;
+  }
+  .brand {
+    font-size: 18px;
+    gap: 6px;
+  }
+  nav button {
+    font-size: 8px;
+  }
+  .theme-toggle svg {
+    width: 14px;
+  }
+}
+
+/* Theme palette overrides. OLED keeps page and panel surfaces truly black. */
+[data-theme="light"] {
+  --theme-link: #174c4c;
+}
+[data-theme="discord"] {
+  --bg: #313338;
+  --card: #2b2d31;
+  --ink: #f2f3f5;
+  --muted: #b5bac1;
+  --line: #45474e;
+  --wash: #383a40;
+  --accent: #4752c4;
+  --theme-link: #a9b5ff;
+  --theme-emphasis: #b4baff;
+  --map-border: #45474e;
+}
+[data-theme="dark"] {
+  --bg: #101010;
+  --card: #191919;
+  --ink: #f0f0f0;
+  --muted: #b3b3b3;
+  --line: #383838;
+  --wash: #252525;
+  --accent: #285d53;
+  --theme-link: #a3d9c8;
+  --theme-emphasis: #a3d9c8;
+  --map-border: #3c3c3c;
+}
+[data-theme="oled"] {
+  --bg: #000;
+  --card: #000;
+  --ink: #fff;
+  --muted: #bebebe;
+  --line: #393939;
+  --wash: #101010;
+  --accent: #214e44;
+  --theme-link: #aaf0d5;
+  --theme-emphasis: #aaf0d5;
+  --map-border: #333;
+}
+[data-theme="midnight"] {
+  --theme-link: #9dd4c5;
+  --theme-emphasis: #91b9a4;
+  --map-border: #31474a;
+}
+[data-theme="sepia"] {
+  color-scheme: light;
+  --bg: #efe5d3;
+  --card: #fbf2e3;
+  --ink: #493b2e;
+  --muted: #756452;
+  --line: #d6c5ac;
+  --wash: #e8dbc5;
+  --accent: #6b4f34;
+  --theme-link: #6b4f34;
+  --theme-emphasis: #805f3c;
+  background: var(--bg);
+  color: var(--ink);
+}
+.theme-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.theme-picker select {
+  width: 158px;
+  cursor: pointer;
+}
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"],
+    [data-theme="sepia"]
+  )
+  .notice,
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"],
+    [data-theme="sepia"]
+  )
+  .run-strip {
+  background: var(--card);
+  color: var(--ink);
+  border-color: var(--line);
+}
+:is(
+    [data-theme="dark"],
+    [data-theme="discord"],
+    [data-theme="oled"],
+    [data-theme="midnight"],
+    [data-theme="sepia"]
+  )
+  .run-strip
+  span {
+  color: var(--muted);
+}
+[data-theme] h1 em {
+  color: var(--theme-emphasis, #527c69);
+}
+[data-theme] a {
+  color: var(--theme-link, var(--accent));
+}
+[data-theme] .brand {
+  color: var(--ink);
+}
+[data-theme] .map-scroll path[role="button"] {
+  stroke: var(--map-border, #f7f6f0);
+}
+.electoral-bar svg > rect:first-child,
+.probability svg > rect:first-child {
+  fill: var(--wash);
+}
+.electoral-bar svg > path {
+  stroke: var(--ink);
+}
+@media (max-width: 720px) {
+  .theme-picker {
+    gap: 4px;
+  }
+  .theme-picker > span {
+    display: none;
+  }
+  .theme-picker select {
+    width: 125px;
+    font-size: 10px;
+    padding: 8px 5px;
+  }
+}
+@media (max-width: 420px) {
+  header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 77px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  header nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
 }
