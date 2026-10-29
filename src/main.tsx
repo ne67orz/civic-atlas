@@ -882,6 +882,7 @@ function App() {
                           onChange={(e) => update(i, { bio: e.target.value })}
                         />
                       </label>
+                      {!c.isRealPublicFigure && !c.isPublicPersona && c.lookupStatus && <p role="status">Identity lookup: {c.lookupStatus}. Source links below may be news, social results, or pageview statistics.</p>}
                       {c.politicalSummary && <div className="political-summary">
                         <h4>Political ideals · {c.politicalConfidence || "low"} confidence</h4>
                         <p>{c.politicalSummary}</p>

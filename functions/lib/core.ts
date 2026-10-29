@@ -27,7 +27,7 @@ export async function bounded(
     headers: { "User-Agent": UA, ...init.headers },
     signal: AbortSignal.timeout(4500),
   });
-  if (!res.ok) throw Error("Upstream unavailable");
+  if (!res.ok) throw Error(`${new URL(url).hostname} returned HTTP ${res.status}`);
   const reader = res.body?.getReader();
   if (!reader) throw Error("Empty body");
   let size = 0,

@@ -33,3 +33,10 @@ it("overrides unsupported model politics when political evidence is missing", as
   expect(result.profiles[0].ideology).toEqual([0, 0, 0, 0]);
   expect(result.profiles[0].politicalSummary).not.toContain("Invented");
 });
+
+it("explains when identity and evidence succeeded but AI is not connected", async () => {
+  const result = await generate({ publicFigure: true, politicalEvidence: "Documented campaign policies", sources: ["https://en.wikipedia.org/wiki/Example"] });
+  expect(result.profiles[0].isRealPublicFigure).toBe(true);
+  expect(result.profiles[0].politicalSummary).toContain("Connect OpenRouter");
+  expect(completion).not.toHaveBeenCalled();
+});

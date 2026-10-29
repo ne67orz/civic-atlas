@@ -34,7 +34,7 @@ self.onmessage = async ({ data }) => {
           party: item.party,
           label: item.label || "",
           bio: unknown
-            ? "Unverified profile. No public-figure source was retrieved. These are editable simulation assumptions, not biographical facts. Enable live sources and generate profiles to retry verification."
+            ? "Unverified profile. Identity verification did not complete. News or social links alone do not verify identity. These are editable simulation assumptions, not biographical facts. Enable live sources and generate profiles to retry verification."
             : "Profile based on retrieved public sources.",
           ideology: [0, 0, 0, 0],
           appeal: { education: 0, urban: 0, young: 0 },
@@ -44,7 +44,10 @@ self.onmessage = async ({ data }) => {
           homeState: "",
           isRealPublicFigure: !!item.signals?.publicFigure,
           isPublicPersona: !!item.signals?.persona,
-          politicalSummary: "Political positions have not been established from retrieved evidence. Slider values are simulation assumptions.",
+          lookupStatus: String(item.signals?.statuses?.wikipedia || "Live identity lookup was not run.").slice(0, 500),
+          politicalSummary: !unknown && !data.key && item.signals?.politicalEvidence
+            ? "Public sources were retrieved. Connect OpenRouter and generate profiles again to summarize political ideals. Slider values have not yet been estimated."
+            : "Political positions have not been established from retrieved evidence. Slider values are simulation assumptions.",
           politicalConfidence: "low",
           sources: item.signals?.sources || [],
         };
@@ -74,6 +77,7 @@ self.onmessage = async ({ data }) => {
           sources: base.sources,
           isRealPublicFigure: !!item.signals?.publicFigure,
           isPublicPersona: !!item.signals?.persona,
+          lookupStatus: String(item.signals?.statuses?.wikipedia || "Live identity lookup was not run.").slice(0, 500),
           ...(!item.signals?.politicalEvidence ? {
             ideology: [0, 0, 0, 0] as Profile["ideology"],
             politicalSummary: base.politicalSummary,

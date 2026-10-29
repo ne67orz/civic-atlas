@@ -52,7 +52,7 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
   }
   const name = parsed.data,
     key =
-      "candidate:v3:" +
+      "candidate:v4:" +
       Array.from(
         new Uint8Array(
           await crypto.subtle.digest(
@@ -112,6 +112,10 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
       x: "disabled: paid API",
     },
   };
-  await write(ctx.env.SIGNALS, key, value);
-  return json(value, 200, "private, max-age=10800");
+  // Transient identity failures must not trap users in a six-hour failed lookup.
+  if (figure.publicFigure || figure.persona) {
+    await write(ctx.env.SIGNALS, key, value);
+    return json(value, 200, "private, max-age=10800");
+  }
+  return json(value, 200, "no-store");
 };

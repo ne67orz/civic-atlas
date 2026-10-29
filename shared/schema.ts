@@ -35,6 +35,7 @@ export const ProfileSchema = z
     homeState: z.string().regex(/^([A-Z]{2})?$/),
     isRealPublicFigure: z.boolean(),
     isPublicPersona: z.boolean().optional(),
+    lookupStatus: z.string().max(500).optional(),
     politicalSummary: z.string().max(2400).optional(),
     politicalConfidence: z.enum(["low", "medium", "high"]).optional(),
     sources: z

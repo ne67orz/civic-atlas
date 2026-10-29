@@ -86,5 +86,22 @@ it.each(["Mayor of New York City", "American rapper and record producer", "Inter
     env: { SIGNALS: store, TURNSTILE_SECRET_KEY: "test" },
   });
   expect((await response.json()).publicFigure).toBe(true);
-  expect(store.get.mock.calls[0][0]).toMatch(/^candidate:v3:/);
+  expect(store.get.mock.calls[0][0]).toMatch(/^candidate:v4:/);
+});
+
+it("does not cache a failed identity lookup even when news sources succeed", async () => {
+  vi.stubGlobal("fetch", async (url: string) => {
+    if (url.includes("siteverify")) return Response.json({success: true, hostname: "demo.pages.dev", action: "candidate"});
+    if (url.includes("wikipedia")) return new Response("limited", {status: 429});
+    if (url.includes("news.google")) return new Response("<rss/>");
+    return Response.json({items: [], posts: []});
+  });
+  const store = kv();
+  const response = await (candidate as any)({request: new Request("https://demo.pages.dev/api/candidate-signals?name=Kanye%20West", {headers: {"X-Turnstile-Token": "test"}}), env: {SIGNALS: store, TURNSTILE_SECRET_KEY: "test"}});
+  const value = await response.json();
+  expect(value.publicFigure).toBe(false);
+  expect(value.sources.length).toBeGreaterThan(0);
+  expect(value.statuses.wikipedia).toContain("HTTP 429");
+  expect(response.headers.get("Cache-Control")).toBe("no-store");
+  expect(store.put).not.toHaveBeenCalled();
 });
