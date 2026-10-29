@@ -1,9 +1,129 @@
-import {it,expect,vi,afterEach,beforeEach} from 'vitest';
-import {authorize,exchange,completion,saveKey,readKey,validateKey} from '../src/openrouter';
-import {z} from 'zod';
-class MemoryStorage{data=new Map<string,string>();getItem(k:string){return this.data.get(k)??null;}setItem(k:string,v:string){this.data.set(k,v);}removeItem(k:string){this.data.delete(k);}}
-beforeEach(()=>{vi.stubGlobal('sessionStorage',new MemoryStorage());vi.stubGlobal('localStorage',new MemoryStorage());});afterEach(()=>vi.unstubAllGlobals());
-it('PKCE generates S256, checks state and exchanges directly',async()=>{const url=new URL(await authorize('https://example.pages.dev/'));expect(url.searchParams.get('code_challenge_method')).toBe('S256');const state=url.searchParams.get('state');const mock=vi.fn(async(url:string,init:RequestInit)=>{expect(url).toBe('https://openrouter.ai/api/v1/auth/keys');expect(JSON.parse(String(init.body)).code_verifier.length).toBeGreaterThan(40);return Response.json({key:'sk-or-test-1234567890'});});vi.stubGlobal('fetch',mock);expect(await exchange('code',state)).toBe('sk-or-test-1234567890');expect(sessionStorage.getItem('atlas-pkce')).toBeNull();await authorize('https://example.pages.dev/');await expect(exchange('code','wrong')).rejects.toThrow('state');});
-it('keys are session-only by default, remembered only with opt-in and removable',()=>{saveKey('test');expect(readKey()).toBe('test');expect(localStorage.getItem('atlas-key')).toBeNull();saveKey('test',true);expect(sessionStorage.getItem('atlas-key')).toBeNull();saveKey('');expect(readKey()).toBe('');});
-it('every request carrying a key goes only to OpenRouter; invalid JSON repairs within budget',async()=>{let count=0;const secret='sk-or-test-1234567890';vi.stubGlobal('fetch',vi.fn(async(url:string,init:RequestInit)=>{expect(new URL(url).origin).toBe('https://openrouter.ai');expect(JSON.stringify(init.body||'')).not.toContain(secret);if(url.endsWith('/key'))return Response.json({data:{is_free_tier:true}});count++;return Response.json({choices:[{message:{content:count===1?'invalid':'{"ok":true}'}}]});}));await validateKey(secret);const budget={calls:0,max:2};expect(await completion(secret,['openrouter/free'],'system','prompt',z.object({ok:z.boolean()}),budget)).toEqual({ok:true});expect(budget.calls).toBe(2);});
-it('free-model fallback never exceeds shared call ceiling',async()=>{const mock=vi.fn(async()=>new Response('',{status:429}));vi.stubGlobal('fetch',mock);const budget={calls:9,max:10};await expect(completion('sk-or-test-1234567890',['openrouter/free'],'','',z.object({}),budget)).rejects.toThrow('limit');expect(mock).toHaveBeenCalledTimes(1);});
+import { it, expect, vi, afterEach, beforeEach } from "vitest";
+import {
+  authorize,
+  exchange,
+  completion,
+  saveKey,
+  readKey,
+  validateKey,
+} from "../src/openrouter";
+import { z } from "zod";
+class MemoryStorage {
+  data = new Map<string, string>();
+  getItem(k: string) {
+    return this.data.get(k) ?? null;
+  }
+  setItem(k: string, v: string) {
+    this.data.set(k, v);
+  }
+  removeItem(k: string) {
+    this.data.delete(k);
+  }
+}
+beforeEach(() => {
+  vi.stubGlobal("sessionStorage", new MemoryStorage());
+  vi.stubGlobal("localStorage", new MemoryStorage());
+});
+afterEach(() => vi.unstubAllGlobals());
+it("PKCE generates S256, checks state and exchanges directly", async () => {
+  const url = new URL(await authorize("https://example.pages.dev/"));
+  expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+  const state = url.searchParams.get("state");
+  const mock = vi.fn(async (url: string, init: RequestInit) => {
+    expect(url).toBe("https://openrouter.ai/api/v1/auth/keys");
+    expect(JSON.parse(String(init.body)).code_verifier.length).toBeGreaterThan(
+      40,
+    );
+    return Response.json({ key: "sk-or-test-1234567890" });
+  });
+  vi.stubGlobal("fetch", mock);
+  expect(await exchange("code", state)).toBe("sk-or-test-1234567890");
+  expect(sessionStorage.getItem("atlas-pkce")).toBeNull();
+  await authorize("https://example.pages.dev/");
+  await expect(exchange("code", "wrong")).rejects.toThrow("state");
+});
+it("keys are session-only by default, remembered only with opt-in and removable", () => {
+  saveKey("test");
+  expect(readKey()).toBe("test");
+  expect(localStorage.getItem("atlas-key")).toBeNull();
+  saveKey("test", true);
+  expect(sessionStorage.getItem("atlas-key")).toBeNull();
+  saveKey("");
+  expect(readKey()).toBe("");
+});
+it("every request carrying a key goes only to OpenRouter; invalid JSON repairs within budget", async () => {
+  let count = 0;
+  const secret = "sk-or-test-1234567890";
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init: RequestInit) => {
+      expect(new URL(url).origin).toBe("https://openrouter.ai");
+      expect(JSON.stringify(init.body || "")).not.toContain(secret);
+      if (url.endsWith("/key"))
+        return Response.json({ data: { is_free_tier: true } });
+      count++;
+      return Response.json({
+        choices: [
+          { message: { content: count === 1 ? "invalid" : '{"ok":true}' } },
+        ],
+      });
+    }),
+  );
+  await validateKey(secret);
+  const budget = { calls: 0, max: 2 };
+  expect(
+    await completion(
+      secret,
+      ["openrouter/free"],
+      "system",
+      "prompt",
+      z.object({ ok: z.boolean() }),
+      budget,
+    ),
+  ).toEqual({ ok: true });
+  expect(budget.calls).toBe(2);
+});
+it("free-model fallback never exceeds shared call ceiling", async () => {
+  const mock = vi.fn(async () => new Response("", { status: 429 }));
+  vi.stubGlobal("fetch", mock);
+  const budget = { calls: 9, max: 10 };
+  await expect(
+    completion(
+      "sk-or-test-1234567890",
+      ["openrouter/free"],
+      "",
+      "",
+      z.object({}),
+      budget,
+    ),
+  ).rejects.toThrow("limit");
+  expect(mock).toHaveBeenCalledTimes(1);
+});
+it("rejects credential-like content in allowlisted share fields", async () => {
+  const { InputSchema } = await import("../shared/schema");
+  const { DEFAULT_ENV } = await import("../shared/states");
+  const p = {
+    name: "Fictional Adult",
+    party: "Independent",
+    label: "",
+    bio: "sk-or-test-1234567890",
+    ideology: [0, 0, 0, 0],
+    appeal: { education: 0, urban: 0, young: 0 },
+    recognition: 0.5,
+    favorability: 0,
+    controversy: 0,
+    homeState: "",
+    isRealPublicFigure: false,
+    sources: [],
+  };
+  expect(
+    InputSchema.safeParse({
+      version: 1,
+      dataVersion: "2024-v1",
+      seed: 1,
+      environment: DEFAULT_ENV,
+      narrative: "",
+      candidates: [p, { ...p, name: "Another Adult" }],
+    }).success,
+  ).toBe(false);
+});

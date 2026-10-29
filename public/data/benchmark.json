@@ -1,0 +1,17 @@
+{
+  "measuredAt": "2026-10-29T17:09:24.527Z",
+  "runtime": "v24.22.1",
+  "units": 3113,
+  "trials": 1000,
+  "elapsedMs": 2249,
+  "ev": [
+    282,
+    256
+  ],
+  "probabilities": [
+    0.388,
+    0.604
+  ],
+  "networkDuringSimulation": 0,
+  "kvDuringSimulation": 0
+}

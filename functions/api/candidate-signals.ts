@@ -1,15 +1,136 @@
-import {Name} from '../../shared/schema';
-import {json,sameOrigin,bounded,read,write,news,bluesky,TTL,type Bindings} from '../lib/core';
-import {hash} from '../../shared/engine';
-export const onRequestGet:PagesFunction<Bindings>=async ctx=>{
- if(!sameOrigin(ctx.request))return json({error:'Same-origin access only'},403);
- const parsed=Name.safeParse(new URL(ctx.request.url).searchParams.get('name'));if(!parsed.success)return json({error:'Invalid candidate name'},400);
- const token=ctx.request.headers.get('X-Turnstile-Token');if(!token||token.length>2048||!ctx.env.TURNSTILE_SECRET_KEY)return json({error:'Bot verification unavailable. Use hypothetical profiles.'},503);
- try{const check=JSON.parse(await bounded('https://challenges.cloudflare.com/turnstile/v0/siteverify',12000,{method:'POST',body:new URLSearchParams({secret:ctx.env.TURNSTILE_SECRET_KEY,response:token})}));const host=new URL(ctx.request.url).hostname;if(!check.success||(check.hostname!==host&&check.hostname!=='localhost'))return json({error:'Bot verification failed'},403);}catch{return json({error:'Bot verification unavailable'},503);}
- const name=parsed.data,key='candidate:'+hash(name.toLowerCase().normalize('NFKC'));const cached=await read<{timestamp:string}>(ctx.env.SIGNALS,key);if(cached&&Date.now()-Date.parse(cached.timestamp)<TTL*1000)return json(cached,200,'private, max-age=10800');
- const sources:string[]=[],statuses:Record<string,string>={};let summary='',publicFigure=false,minor=false;
- try{const url='https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(name.replaceAll(' ','_'));const d=JSON.parse(await bounded(url,48000));summary=String(d.extract||'').slice(0,3000);const desc=String(d.description||'');publicFigure=d.type==='standard'&&/(politician|president|senator|governor|representative|activist|business|author|actor|journalist|minister|lawyer|economist)/i.test(desc);minor=/\b(child|minor|teenager)\b/i.test(desc);if(d.content_urls?.desktop?.page)sources.push(d.content_urls.desktop.page);statuses.wikipedia='available';}catch{statuses.wikipedia='unavailable';}
- const headlines=await news(name).catch(()=>null),social=await bluesky(name).catch(()=>null);if(headlines)sources.push(headlines.url);if(social)sources.push(social.url);
- let pageviews:number|null=null;try{const end=new Date(Date.now()-2*86400000),start=new Date(end.getTime()-7*86400000),fmt=(d:Date)=>d.toISOString().slice(0,10).replaceAll('-','');const url=`https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/${encodeURIComponent(name.replaceAll(' ','_'))}/daily/${fmt(start)}/${fmt(end)}`;const d=JSON.parse(await bounded(url,16000));pageviews=d.items?.reduce((a:number,x:{views:number})=>a+x.views,0)??null;sources.push(url);statuses.pageviews='available';}catch{statuses.pageviews='unavailable';}
- const value={name,timestamp:new Date().toISOString(),summary,publicFigure,minor,headlines:headlines?.items||[],social: social?.items||[],publicPostSampleCount:social?.items.length??null,pageviews,sources,statuses:{...statuses,news:headlines?'available':'unavailable',bluesky:social?'sample only':'unavailable',reddit:'disabled: unreliable cloud access',x:'disabled: paid API'}};await write(ctx.env.SIGNALS,key,value);return json(value,200,'private, max-age=10800');
+import { Name } from "../../shared/schema";
+import {
+  json,
+  sameOrigin,
+  bounded,
+  read,
+  write,
+  news,
+  bluesky,
+  TTL,
+  type Bindings,
+} from "../lib/core";
+export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
+  if (!sameOrigin(ctx.request))
+    return json({ error: "Same-origin access only" }, 403);
+  const parsed = Name.safeParse(
+    new URL(ctx.request.url).searchParams.get("name"),
+  );
+  if (!parsed.success) return json({ error: "Invalid candidate name" }, 400);
+  const token = ctx.request.headers.get("X-Turnstile-Token");
+  if (!token || token.length > 2048 || !ctx.env.TURNSTILE_SECRET_KEY)
+    return json(
+      { error: "Bot verification unavailable. Use hypothetical profiles." },
+      503,
+    );
+  try {
+    const check = JSON.parse(
+      await bounded(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        12000,
+        {
+          method: "POST",
+          body: new URLSearchParams({
+            secret: ctx.env.TURNSTILE_SECRET_KEY,
+            response: token,
+          }),
+        },
+      ),
+    );
+    const host = new URL(ctx.request.url).hostname;
+    const localTest =
+      ["localhost", "127.0.0.1"].includes(host) &&
+      ctx.env.TURNSTILE_SECRET_KEY === "1x0000000000000000000000000000000AA";
+    if (
+      !check.success ||
+      (!localTest && (check.hostname !== host || check.action !== "candidate"))
+    )
+      return json({ error: "Bot verification failed" }, 403);
+  } catch {
+    return json({ error: "Bot verification unavailable" }, 503);
+  }
+  const name = parsed.data,
+    key =
+      "candidate:" +
+      Array.from(
+        new Uint8Array(
+          await crypto.subtle.digest(
+            "SHA-256",
+            new TextEncoder().encode(name.toLowerCase().normalize("NFKC")),
+          ),
+        ),
+      )
+        .map((x) => x.toString(16).padStart(2, "0"))
+        .join("");
+  const cached = await read<{ timestamp: string }>(ctx.env.SIGNALS, key);
+  if (cached && Date.now() - Date.parse(cached.timestamp) < TTL * 1000)
+    return json(cached, 200, "private, max-age=10800");
+  const sources: string[] = [],
+    statuses: Record<string, string> = {};
+  let summary = "",
+    publicFigure = false,
+    minor = false;
+  try {
+    const url =
+      "https://en.wikipedia.org/api/rest_v1/page/summary/" +
+      encodeURIComponent(name.replaceAll(" ", "_"));
+    const d = JSON.parse(await bounded(url, 48000));
+    summary = String(d.extract || "").slice(0, 3000);
+    const desc = String(d.description || "");
+    publicFigure =
+      d.type === "standard" &&
+      /(politician|president|senator|governor|representative|activist|business|author|actor|journalist|minister|lawyer|economist)/i.test(
+        desc,
+      );
+    const birth = summary.match(/\bborn\b[^.;]{0,80}?\b(19\d{2}|20\d{2})\b/i);
+    minor =
+      /\b(child|minor|teenager)\b/i.test(desc) ||
+      (!!birth && Number(birth[1]) > new Date().getUTCFullYear() - 18);
+    publicFigure = publicFigure && !minor;
+    if (d.content_urls?.desktop?.page)
+      sources.push(d.content_urls.desktop.page);
+    statuses.wikipedia = "available";
+  } catch {
+    statuses.wikipedia = "unavailable";
+  }
+  const headlines = await news(name).catch(() => null),
+    social = await bluesky(name).catch(() => null);
+  if (headlines) sources.push(headlines.url);
+  if (social) sources.push(social.url);
+  let pageviews: number | null = null;
+  try {
+    const end = new Date(Date.now() - 2 * 86400000),
+      start = new Date(end.getTime() - 7 * 86400000),
+      fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll("-", "");
+    const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/${encodeURIComponent(name.replaceAll(" ", "_"))}/daily/${fmt(start)}/${fmt(end)}`;
+    const d = JSON.parse(await bounded(url, 16000));
+    pageviews =
+      d.items?.reduce((a: number, x: { views: number }) => a + x.views, 0) ??
+      null;
+    sources.push(url);
+    statuses.pageviews = "available";
+  } catch {
+    statuses.pageviews = "unavailable";
+  }
+  const value = {
+    name,
+    timestamp: new Date().toISOString(),
+    summary,
+    publicFigure,
+    minor,
+    headlines: headlines?.items || [],
+    social: social?.items || [],
+    publicPostSampleCount: social?.items.length ?? null,
+    pageviews,
+    sources,
+    statuses: {
+      ...statuses,
+      news: headlines ? "available" : "unavailable",
+      bluesky: social ? "sample only" : "unavailable",
+      reddit: "disabled: unreliable cloud access",
+      x: "disabled: paid API",
+    },
+  };
+  await write(ctx.env.SIGNALS, key, value);
+  return json(value, 200, "private, max-age=10800");
 };
