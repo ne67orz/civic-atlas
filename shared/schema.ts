@@ -5,7 +5,7 @@ export const Name = z
   .min(2)
   .max(70)
   .regex(
-    /^[\p{L}\p{M} .,'’\-]+$/u,
+    /^[\p{L}\p{M}0-9 .,'’()\-]+$/u,
     "Use a name, not instructions or special characters",
   )
   .refine(
@@ -34,6 +34,9 @@ export const ProfileSchema = z
     controversy: fraction,
     homeState: z.string().regex(/^([A-Z]{2})?$/),
     isRealPublicFigure: z.boolean(),
+    isPublicPersona: z.boolean().optional(),
+    politicalSummary: z.string().max(2400).optional(),
+    politicalConfidence: z.enum(["low", "medium", "high"]).optional(),
     sources: z
       .array(
         z

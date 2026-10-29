@@ -11,7 +11,7 @@ export async function token(container: HTMLElement) {
   const sitekey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
   if (!sitekey)
     throw Error(
-      "Live retrieval needs a configured Turnstile site key. Hypothetical profiles are available.",
+      "Live retrieval needs a configured Turnstile site key. Unverified simulation profiles are available.",
     );
   if (!window.turnstile) {
     loading ??= new Promise((resolve, reject) => {

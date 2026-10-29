@@ -28,38 +28,36 @@ self.onmessage = async ({ data }) => {
           throw Error(
             "Use adult public figures or neutral fictional candidates. Profiles describing minors or abusive content are not supported.",
           );
-        const unknown = !item.signals?.publicFigure;
+        const unknown = !item.signals?.publicFigure && !item.signals?.persona;
         const base: Profile = {
           name: item.name,
           party: item.party,
           label: item.label || "",
           bio: unknown
-            ? "Hypothetical candidate. No verified public-figure source was retrieved."
+            ? "Unverified profile. No public-figure source was retrieved. These are editable simulation assumptions, not biographical facts. Enable live sources and generate profiles to retry verification."
             : "Profile based on retrieved public sources.",
-          ideology:
-            item.party === "Democratic"
-              ? [-0.45, -0.45, 0, -0.1]
-              : item.party === "Republican"
-                ? [0.45, 0.45, 0.1, 0.2]
-                : [0, 0, 0.2, 0],
+          ideology: [0, 0, 0, 0],
           appeal: { education: 0, urban: 0, young: 0 },
           recognition: unknown ? 0.5 : 0.9,
           favorability: 0,
           controversy: 0,
           homeState: "",
-          isRealPublicFigure: !unknown,
+          isRealPublicFigure: !!item.signals?.publicFigure,
+          isPublicPersona: !!item.signals?.persona,
+          politicalSummary: "Political positions have not been established from retrieved evidence. Slider values are simulation assumptions.",
+          politicalConfidence: "low",
           sources: item.signals?.sources || [],
         };
         if (item.signals?.minor)
           throw Error("Profiles for minors are not supported.");
-        // Unknown names remain explicitly fictional; never infer facts about private people.
+        // Missing evidence does not establish that a person is fictional. Do not invent a biography.
         const profile =
-          MOCK || unknown
+          MOCK || unknown || !data.key
             ? base
             : await completion(
                 data.key,
                 data.models,
-                "Write a neutral profile of a verified adult public figure only, solely from the supplied evidence. No invented quotes, misconduct, scandals, private details, hateful or sexual content. Use the provided JSON keys exactly; ideology has four values in [-1,1], appeal values in [-1,1], recognition and controversy in [0,1], favorability in [-1,1]. Keep name and party unchanged.",
+                "Write a neutral profile of the identified adult public figure or public persona solely from supplied evidence. For fictional personas, discuss only fictional/canonical positions and clearly label them; never attribute a persona’s views to its performer. No invented quotes, misconduct, scandals, private details, hateful or sexual content. Use the provided JSON keys exactly; ideology has four values in [-1,1], appeal values in [-1,1], recognition and controversy in [0,1], favorability in [-1,1]. Keep name and party unchanged; party is the user’s scenario choice, not evidence of actual beliefs. politicalSummary must describe documented political ideals and positions with source URLs from the supplied sources, noting dates, changes, conflicts and gaps; maximum 2400 characters. politicalConfidence is low, medium or high based on the available political evidence, not fame. Do not infer politics from occupation, identity, religion, popularity, headlines or social posts. Use politicalEvidence as the main basis. Ideology axes in order: economic left (-1) to right (+1), socially progressive (-1) to conservative (+1), establishment (-1) to populist (+1), dovish (-1) to hawkish (+1). Explain these numeric estimates as simulation assumptions; use 0 for unsupported axes. If no relevant evidence exists, say political views are unknown, set all ideology axes to 0 and politicalConfidence to low. Do not invent policy positions or treat model memory as retrieved evidence.",
                 JSON.stringify({
                   template: base,
                   evidence: `<untrusted_material>${JSON.stringify(item.signals)}</untrusted_material>`,
@@ -74,7 +72,13 @@ self.onmessage = async ({ data }) => {
           name: item.name,
           party: item.party,
           sources: base.sources,
-          isRealPublicFigure: !unknown,
+          isRealPublicFigure: !!item.signals?.publicFigure,
+          isPublicPersona: !!item.signals?.persona,
+          ...(!item.signals?.politicalEvidence ? {
+            ideology: [0, 0, 0, 0] as Profile["ideology"],
+            politicalSummary: base.politicalSummary,
+            politicalConfidence: "low" as const,
+          } : {}),
         });
         self.postMessage({
           type: "progress",

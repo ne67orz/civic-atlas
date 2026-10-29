@@ -229,13 +229,18 @@ function App() {
             "/api/candidate-signals?name=" + encodeURIComponent(c.name),
             {
               headers: { "X-Turnstile-Token": t },
-              signal: AbortSignal.timeout(25000),
+              signal: AbortSignal.timeout(40000),
             },
           );
-          if (res.ok) signals = await res.json();
+          if (res.ok) {
+            const retrieved = await res.json() as { publicFigure?: boolean; persona?: boolean; statuses?: { wikipedia?: string } };
+            signals = retrieved;
+            if (!retrieved.publicFigure && !retrieved.persona)
+              setMessage(`Could not verify ${c.name}: ${retrieved.statuses?.wikipedia || "No identity source found"}. Try a full name or a specific Wikipedia title.`);
+          }
           else
             setMessage(
-              "Live sources unavailable. Unknown names will use hypothetical profiles.",
+              `Live lookup failed for ${c.name} (HTTP ${res.status}). Check the Turnstile keys and hostname, then generate profiles again. Unverified profiles use simulation assumptions.`,
             );
         }
         items.push({ ...c, signals });
@@ -667,13 +672,13 @@ function App() {
                 </label>
                 <button
                   className="secondary full"
-                  disabled={!!busy || (live && !key && !MOCK)}
+                  disabled={!!busy}
                   onClick={generate}
                 >
                   Generate profiles <ArrowRight size={16} />
                 </button>
                 <small className="muted">
-                  Unknown names become explicitly hypothetical profiles.
+                  Enable live sources to verify public figures. Without retrieved evidence, profiles remain unverified simulation assumptions.
                 </small>
                 <div ref={bot} />
               </section>
@@ -866,7 +871,7 @@ function App() {
                         <span className="pill">
                           {c.isRealPublicFigure
                             ? "Public figure"
-                            : "Hypothetical"}
+                            : c.isPublicPersona ? "Public persona" : "Unverified"}
                         </span>
                       </h3>
                       <label>
@@ -877,6 +882,11 @@ function App() {
                           onChange={(e) => update(i, { bio: e.target.value })}
                         />
                       </label>
+                      {c.politicalSummary && <div className="political-summary">
+                        <h4>Political ideals · {c.politicalConfidence || "low"} confidence</h4>
+                        <p>{c.politicalSummary}</p>
+                        <small className="muted">Ideology sliders are editable simulation estimates, not measured facts. Zero may mean insufficient evidence. Party is your scenario choice.</small>
+                      </div>}
                       <div className="profile-grid">
                         {["Economic", "Social", "Populism", "Hawkishness"].map(
                           (label, k) => (

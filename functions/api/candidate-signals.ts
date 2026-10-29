@@ -1,3 +1,4 @@
+import { lookupFigure } from "../lib/figure";
 import { Name } from "../../shared/schema";
 import {
   json,
@@ -20,7 +21,7 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
   const token = ctx.request.headers.get("X-Turnstile-Token");
   if (!token || token.length > 2048 || !ctx.env.TURNSTILE_SECRET_KEY)
     return json(
-      { error: "Bot verification unavailable. Use hypothetical profiles." },
+      { error: "Bot verification unavailable. Profiles remain unverified." },
       503,
     );
   try {
@@ -51,7 +52,7 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
   }
   const name = parsed.data,
     key =
-      "candidate:" +
+      "candidate:v3:" +
       Array.from(
         new Uint8Array(
           await crypto.subtle.digest(
@@ -67,31 +68,13 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
     return json(cached, 200, "private, max-age=10800");
   const sources: string[] = [],
     statuses: Record<string, string> = {};
-  let summary = "",
-    publicFigure = false,
-    minor = false;
+  let figure = { resolvedName: name, summary: "", politicalEvidence: "", publicFigure: false, persona: false, minor: false, sources: [] as string[], identityStatus: "unavailable" };
   try {
-    const url =
-      "https://en.wikipedia.org/api/rest_v1/page/summary/" +
-      encodeURIComponent(name.replaceAll(" ", "_"));
-    const d = JSON.parse(await bounded(url, 48000));
-    summary = String(d.extract || "").slice(0, 3000);
-    const desc = String(d.description || "");
-    publicFigure =
-      d.type === "standard" &&
-      /(politician|president|senator|governor|representative|activist|business|author|actor|journalist|minister|lawyer|economist)/i.test(
-        desc,
-      );
-    const birth = summary.match(/\bborn\b[^.;]{0,80}?\b(19\d{2}|20\d{2})\b/i);
-    minor =
-      /\b(child|minor|teenager)\b/i.test(desc) ||
-      (!!birth && Number(birth[1]) > new Date().getUTCFullYear() - 18);
-    publicFigure = publicFigure && !minor;
-    if (d.content_urls?.desktop?.page)
-      sources.push(d.content_urls.desktop.page);
-    statuses.wikipedia = "available";
-  } catch {
-    statuses.wikipedia = "unavailable";
+    figure = await lookupFigure(name);
+    sources.push(...figure.sources);
+    statuses.wikipedia = figure.identityStatus;
+  } catch (error) {
+    statuses.wikipedia = error instanceof Error ? error.message : "unavailable";
   }
   const headlines = await news(name).catch(() => null),
     social = await bluesky(name).catch(() => null);
@@ -102,7 +85,7 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
     const end = new Date(Date.now() - 2 * 86400000),
       start = new Date(end.getTime() - 7 * 86400000),
       fmt = (d: Date) => d.toISOString().slice(0, 10).replaceAll("-", "");
-    const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/${encodeURIComponent(name.replaceAll(" ", "_"))}/daily/${fmt(start)}/${fmt(end)}`;
+    const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/${encodeURIComponent(figure.resolvedName.replaceAll(" ", "_"))}/daily/${fmt(start)}/${fmt(end)}`;
     const d = JSON.parse(await bounded(url, 16000));
     pageviews =
       d.items?.reduce((a: number, x: { views: number }) => a + x.views, 0) ??
@@ -115,9 +98,7 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
   const value = {
     name,
     timestamp: new Date().toISOString(),
-    summary,
-    publicFigure,
-    minor,
+    ...figure,
     headlines: headlines?.items || [],
     social: social?.items || [],
     publicPostSampleCount: social?.items.length ?? null,

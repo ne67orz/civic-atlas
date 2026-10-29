@@ -3,7 +3,7 @@ import { onRequestGet as environment } from "../functions/api/environment";
 import { onRequestGet as candidate } from "../functions/api/candidate-signals";
 import { bounded, write, read } from "../functions/lib/core";
 afterEach(() => vi.unstubAllGlobals());
-const kv = () => ({ get: vi.fn(async () => null), put: vi.fn(async () => {}) });
+const kv = () => ({ get: vi.fn(async (_key: string) => null), put: vi.fn(async () => {}) });
 it("environment refreshes at most one source with bounded operations and no LLM", async () => {
   const store = kv(),
     waits: Promise<unknown>[] = [];
@@ -41,7 +41,7 @@ it("quota failures fail open and cross-origin requests are rejected", async () =
   });
   expect(res.status).toBe(403);
 });
-it("candidate verifies token even on cache hits; cold upstream ceiling is five", async () => {
+it("candidate verifies token even on cache hits; cold upstream ceiling is six", async () => {
   const fetch = vi.fn(async (url: string) => {
     if (url.includes("siteverify"))
       return Response.json({
@@ -49,15 +49,8 @@ it("candidate verifies token even on cache hits; cold upstream ceiling is five",
         hostname: "demo.pages.dev",
         action: "candidate",
       });
-    if (url.includes("wikipedia"))
-      return Response.json({
-        type: "standard",
-        description: "American politician",
-        extract: "Public figure",
-        content_urls: {
-          desktop: { page: "https://en.wikipedia.org/wiki/Test" },
-        },
-      });
+    if (url.includes("wikipedia")) return Response.json({ query: { pages: [{ title: "Test Candidate", pageprops: { wikibase_item: "Q123" }, extract: "Public figure" }] } });
+    if (url.includes("wikidata")) return Response.json({ entities: { Q123: { claims: { P31: [{ mainsnak: { datavalue: { value: { id: "Q5" } } } }] } } } });
     if (url.includes("news.google")) return new Response("<rss/>");
     if (url.includes("bsky")) return Response.json({ posts: [] });
     return Response.json({ items: [] });
@@ -72,10 +65,26 @@ it("candidate verifies token even on cache hits; cold upstream ceiling is five",
     env: { SIGNALS: store, TURNSTILE_SECRET_KEY: "test" },
   });
   expect(response.status).toBe(200);
-  expect(fetch).toHaveBeenCalledTimes(5);
+  expect(fetch).toHaveBeenCalledTimes(6);
   expect(store.put).toHaveBeenCalledTimes(1);
 });
 it("caps upstream bodies before parsing", async () => {
   vi.stubGlobal("fetch", async () => new Response("x".repeat(1000)));
   await expect(bounded("https://example.com", 500)).rejects.toThrow("cap");
+});
+it.each(["Mayor of New York City", "American rapper and record producer", "Internet personality", "Chess grandmaster"])("recognizes %s and bypasses older cached classifications", async (description) => {
+  vi.stubGlobal("fetch", async (url: string) => {
+    if (url.includes("siteverify")) return Response.json({ success: true, hostname: "demo.pages.dev", action: "candidate" });
+    if (url.includes("wikipedia")) return Response.json({ query: { pages: [{ title: "Test Mayor", pageprops: { wikibase_item: "Q123" }, extract: "Public figure" }] } });
+    if (url.includes("wikidata")) return Response.json({ entities: { Q123: { descriptions: { en: { value: description } }, claims: { P31: [{ mainsnak: { datavalue: { value: { id: "Q5" } } } }] } } } });
+    if (url.includes("news.google")) return new Response("<rss/>");
+    return Response.json({ posts: [], items: [] });
+  });
+  const store = kv();
+  const response = await (candidate as any)({
+    request: new Request("https://demo.pages.dev/api/candidate-signals?name=Test%20Mayor", { headers: { "X-Turnstile-Token": "test" } }),
+    env: { SIGNALS: store, TURNSTILE_SECRET_KEY: "test" },
+  });
+  expect((await response.json()).publicFigure).toBe(true);
+  expect(store.get.mock.calls[0][0]).toMatch(/^candidate:v3:/);
 });
