@@ -1,0 +1,1 @@
+{"checkedAt": "2026-10-29", "models": ["recursive/flint-v1.0:free", "xingchen-agi/xing4.0-29b-a4b:free", "nvidia/nemotron-3.5-super-vl:free", "dots-studio/dots-3-note-preview:free", "liquid/lfm-2.5-2.6b:free", "nvidia/nemotron-3.5-lightning:free", "thinkingmachines/inkling-small:free", "poolside/laguna-s-2.1:free"], "fallback": "openrouter/free"}

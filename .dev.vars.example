@@ -1,0 +1,5 @@
+# Copy to .dev.vars. Production requires your real Turnstile secret.
+TURNSTILE_SECRET_KEY=
+# Reserved, optional adapters disabled by default:
+BLUESKY_APP_PASSWORD=
+X_BEARER_TOKEN=
