@@ -86,7 +86,7 @@ it.each(["Mayor of New York City", "American rapper and record producer", "Inter
     env: { SIGNALS: store, TURNSTILE_SECRET_KEY: "test" },
   });
   expect((await response.json()).publicFigure).toBe(true);
-  expect(store.get.mock.calls[0][0]).toMatch(/^candidate:v4:/);
+  expect(store.get.mock.calls[0][0]).toMatch(/^candidate:v5:/);
 });
 
 it("does not cache a failed identity lookup even when news sources succeed", async () => {

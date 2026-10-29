@@ -1,3 +1,4 @@
+import { SIGNALS_VERSION } from "../../shared/signals-version";
 import { lookupFigure } from "../lib/figure";
 import { Name } from "../../shared/schema";
 import {
@@ -52,7 +53,7 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
   }
   const name = parsed.data,
     key =
-      "candidate:v4:" +
+      `candidate:v${SIGNALS_VERSION}:` +
       Array.from(
         new Uint8Array(
           await crypto.subtle.digest(
@@ -63,9 +64,9 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
       )
         .map((x) => x.toString(16).padStart(2, "0"))
         .join("");
-  const cached = await read<{ timestamp: string }>(ctx.env.SIGNALS, key);
-  if (cached && Date.now() - Date.parse(cached.timestamp) < TTL * 1000)
-    return json(cached, 200, "private, max-age=10800");
+  const cached = await read<{ timestamp: string; schemaVersion: number }>(ctx.env.SIGNALS, key);
+  if (cached && cached.schemaVersion === SIGNALS_VERSION && Date.now() - Date.parse(cached.timestamp) < TTL * 1000)
+    return json(cached, 200, "no-store");
   const sources: string[] = [],
     statuses: Record<string, string> = {};
   let figure = { resolvedName: name, summary: "", politicalEvidence: "", publicFigure: false, persona: false, minor: false, sources: [] as string[], identityStatus: "unavailable" };
@@ -96,6 +97,7 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
     statuses.pageviews = "unavailable";
   }
   const value = {
+    schemaVersion: SIGNALS_VERSION,
     name,
     timestamp: new Date().toISOString(),
     ...figure,
@@ -115,7 +117,7 @@ export const onRequestGet: PagesFunction<Bindings> = async (ctx) => {
   // Transient identity failures must not trap users in a six-hour failed lookup.
   if (figure.publicFigure || figure.persona) {
     await write(ctx.env.SIGNALS, key, value);
-    return json(value, 200, "private, max-age=10800");
+    return json(value, 200, "no-store");
   }
   return json(value, 200, "no-store");
 };

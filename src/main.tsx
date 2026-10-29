@@ -40,6 +40,7 @@ import {
 } from "./openrouter";
 import { decode, shareUrl } from "./share";
 import { token } from "./turnstile";
+import { candidateSignals } from "./candidate-signals";
 import "./style.css";
 import {
   candidateColor,
@@ -225,23 +226,8 @@ function App() {
         let signals = null;
         if (live && !MOCK) {
           const t = await token(bot.current!);
-          const res = await fetch(
-            "/api/candidate-signals?name=" + encodeURIComponent(c.name),
-            {
-              headers: { "X-Turnstile-Token": t },
-              signal: AbortSignal.timeout(40000),
-            },
-          );
-          if (res.ok) {
-            const retrieved = await res.json() as { publicFigure?: boolean; persona?: boolean; statuses?: { wikipedia?: string } };
-            signals = retrieved;
-            if (!retrieved.publicFigure && !retrieved.persona)
-              setMessage(`Could not verify ${c.name}: ${retrieved.statuses?.wikipedia || "No identity source found"}. Try a full name or a specific Wikipedia title.`);
-          }
-          else
-            setMessage(
-              `Live lookup failed for ${c.name} (HTTP ${res.status}). Check the Turnstile keys and hostname, then generate profiles again. Unverified profiles use simulation assumptions.`,
-            );
+          signals = await candidateSignals(c.name, t);
+
         }
         items.push({ ...c, signals });
       }

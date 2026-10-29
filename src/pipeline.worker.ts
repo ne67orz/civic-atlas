@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { z } from "zod";
 import { simulate, type District } from "../shared/engine";
 import {
   InputSchema,
@@ -35,7 +36,7 @@ self.onmessage = async ({ data }) => {
           label: item.label || "",
           bio: unknown
             ? "Unverified profile. Identity verification did not complete. News or social links alone do not verify identity. These are editable simulation assumptions, not biographical facts. Enable live sources and generate profiles to retry verification."
-            : "Profile based on retrieved public sources.",
+            : String(item.signals?.summary || "Profile based on retrieved public sources.").slice(0, 1200),
           ideology: [0, 0, 0, 0],
           appeal: { education: 0, urban: 0, young: 0 },
           recognition: unknown ? 0.5 : 0.9,
@@ -60,12 +61,15 @@ self.onmessage = async ({ data }) => {
             : await completion(
                 data.key,
                 data.models,
-                "Write a neutral profile of the identified adult public figure or public persona solely from supplied evidence. For fictional personas, discuss only fictional/canonical positions and clearly label them; never attribute a persona’s views to its performer. No invented quotes, misconduct, scandals, private details, hateful or sexual content. Use the provided JSON keys exactly; ideology has four values in [-1,1], appeal values in [-1,1], recognition and controversy in [0,1], favorability in [-1,1]. Keep name and party unchanged; party is the user’s scenario choice, not evidence of actual beliefs. politicalSummary must describe documented political ideals and positions with source URLs from the supplied sources, noting dates, changes, conflicts and gaps; maximum 2400 characters. politicalConfidence is low, medium or high based on the available political evidence, not fame. Do not infer politics from occupation, identity, religion, popularity, headlines or social posts. Use politicalEvidence as the main basis. Ideology axes in order: economic left (-1) to right (+1), socially progressive (-1) to conservative (+1), establishment (-1) to populist (+1), dovish (-1) to hawkish (+1). Explain these numeric estimates as simulation assumptions; use 0 for unsupported axes. If no relevant evidence exists, say political views are unknown, set all ideology axes to 0 and politicalConfidence to low. Do not invent policy positions or treat model memory as retrieved evidence.",
+                "Write a neutral profile of the identified adult public figure or public persona solely from supplied evidence. For fictional personas, discuss only fictional/canonical positions and clearly label them; never attribute a persona’s views to its performer. No invented quotes, misconduct, scandals, private details, hateful or sexual content. Use the provided JSON keys exactly; ideology has four values in [-1,1], appeal values in [-1,1], recognition and controversy in [0,1], favorability in [-1,1]. Keep name and party unchanged; party is the user’s scenario choice, not evidence of actual beliefs. politicalSummary must describe documented political ideals and positions with source URLs from the supplied sources, noting dates, changes, conflicts and gaps; maximum 2400 characters. politicalConfidence is low, medium or high based on the available political evidence, not fame. Do not infer politics from occupation, identity, religion, popularity, headlines or social posts. Use politicalEvidence as the main basis. Ideology axes in order: economic left (-1) to right (+1), socially progressive (-1) to conservative (+1), establishment (-1) to populist (+1), dovish (-1) to hawkish (+1). Read the supplied Wikipedia biography and political passages, synthesize a clear conclusion about the candidate’s political outlook, and explain which documented positions support your assessment. You may draw reasonable, explicitly labeled inferences from those positions rather than only copying ideology labels. Explain these numeric estimates as simulation assumptions; use 0 for unsupported axes. If no relevant evidence exists, say political views are unknown, set all ideology axes to 0 and politicalConfidence to low. Do not invent policy positions or treat model memory as retrieved evidence.",
                 JSON.stringify({
                   template: base,
                   evidence: `<untrusted_material>${JSON.stringify(item.signals)}</untrusted_material>`,
                 }),
-                ProfileSchema,
+                ProfileSchema.extend({
+                  politicalSummary: z.string().min(20).max(2400),
+                  politicalConfidence: z.enum(["low", "medium", "high"]),
+                }),
                 budget,
               );
         profiles.push({
