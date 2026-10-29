@@ -1,0 +1,5 @@
+import type {Input,Result} from './schema';
+export function facts(input:Input,result:Result){return result.states.map(s=>`${s.id}: ${input.candidates[s.winner].name}, margin ${(s.margin*100).toFixed(1)}%, votes ${s.votes.join(',')}`).join('\n')+'\nElectoral votes: '+result.ev.join(', ')+'\nPopular votes: '+result.popular.join(', ');}
+// Each state statement is checked against that state's numbers, not a global number bag.
+export function validNumbers(text:string,allowed:string){const numbers=(s:string)=>(s.match(/\d[\d,]*(?:\.\d+)?/g)||[]).map(x=>Number(x.replace(/,/g,'')));const set=new Set(numbers(allowed));return numbers(text).every(n=>set.has(n));}
+export function fallbackNarrative(input:Input,r:Result){const winner=r.winner===null?'No candidate reaches an electoral majority':`${input.candidates[r.winner].name} reaches an electoral majority`;const close=[...r.states].sort((a,b)=>a.margin-b.margin).slice(0,3).map(s=>s.id).join(', ');return `${winner} in this possible outcome. The closest contests are ${close}. County voting patterns, the national environment, and correlated uncertainty shape this draw. This is an educational scenario, not a forecast.`;}
