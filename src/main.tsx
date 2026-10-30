@@ -39,8 +39,8 @@ import {
   MOCK,
 } from "./openrouter";
 import { decode, shareUrl } from "./share";
-import { token } from "./turnstile";
-import { candidateSignals } from "./candidate-signals";
+import { resolveFigures, automaticMatch, researchFigure, type Match } from "./research";
+import { GEMINI_MODELS, validateGemini } from "./gemini";
 import "./style.css";
 import {
   candidateColor,
@@ -75,7 +75,9 @@ function App() {
       sample("Casey Reed", "Republican"),
     ]),
     [env, setEnv] = useState<Environment>(DEFAULT_ENV),
-    [key, setKey] = useState(readKey),
+    [provider, setProvider] = useState<"openrouter" | "gemini">("openrouter"),
+    [choice, setChoice] = useState<{name:string;matches:Match[];resolve:(m:Match | null)=>void} | null>(null),
+    [key, setKey] = useState(() => readKey()),
     [remember, setRemember] = useState(!!localStorage.getItem("atlas-key")),
     [keyStatus, setKeyStatus] = useState(""),
     [models, setModels] = useState<string[]>(["openrouter/free"]),
@@ -95,7 +97,6 @@ function App() {
     [newSeed, setNewSeed] = useState(0),
     [live, setLive] = useState(false);
   const worker = useRef<Worker | null>(null),
-    bot = useRef<HTMLDivElement>(null),
     importFile = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const system = matchMedia("(prefers-color-scheme: dark)");
@@ -176,6 +177,8 @@ function App() {
       exchange(code, state)
         .then(async (k) => {
           await validateKey(k);
+          setProvider("openrouter");
+          setModel("openrouter/free");
           saveKey(k);
           setKey(k);
           setKeyStatus("Connected · key stays in this browser");
@@ -225,8 +228,11 @@ function App() {
       for (const c of candidates) {
         let signals = null;
         if (live && !MOCK) {
-          const t = await token(bot.current!);
-          signals = await candidateSignals(c.name, t);
+          const matches = await resolveFigures(c.name);
+          if (!matches.length) throw Error(`No public figure or persona with an English Wikipedia page matched ${c.name}. Try a full name or stage name.`);
+          const match = automaticMatch(matches,c.name) || await new Promise<Match | null>(resolve => setChoice({name:c.name,matches,resolve}));
+          if (!match) throw Error("Lookup cancelled. Your existing profiles were kept.");
+          signals = await researchFigure(match);
 
         }
         items.push({ ...c, signals });
@@ -236,7 +242,8 @@ function App() {
         type: "profiles",
         items,
         key,
-        models: [model, ...models.filter((m) => m !== model)],
+        provider,
+        models: provider === "gemini" ? [model] : [model, ...models.filter((m) => m !== model)],
       });
     } catch (e) {
       setBusy("");
@@ -270,7 +277,8 @@ function App() {
         type: "run",
         input: parsed,
         key: imported ? "" : key,
-        models: [model, ...models.filter((m) => m !== model)],
+        provider,
+        models: provider === "gemini" ? [model] : [model, ...models.filter((m) => m !== model)],
         remainingCalls: 10 - calls,
         trials,
       });
@@ -282,13 +290,11 @@ function App() {
   }
   async function connect() {
     try {
-      await validateKey(key);
-      saveKey(key, remember);
+      await (provider === "gemini" ? validateGemini(key) : validateKey(key));
+      saveKey(key, remember, provider);
       setKeyStatus("Connected · key stays in this browser");
-    } catch {
-      setKeyStatus(
-        "Could not validate this key. Check OpenRouter and try again.",
-      );
+    } catch (e) {
+      setKeyStatus(e instanceof Error ? e.message : "Could not validate this key.");
     }
   }
   async function share() {
@@ -666,7 +672,11 @@ function App() {
                 <small className="muted">
                   Enable live sources to verify public figures. Without retrieved evidence, profiles remain unverified simulation assumptions.
                 </small>
-                <div ref={bot} />
+                {choice && <section aria-label="Choose the matching person">
+                  <h3>Who did you mean by {choice.name}?</h3>
+                  {choice.matches.map(m=><button className="secondary full" key={m.id} onClick={()=>{choice.resolve(m);setChoice(null);}}>{m.name} — {m.description}</button>)}
+                  <button onClick={()=>{choice.resolve(null);setChoice(null);}}>Cancel lookup</button>
+                </section>}
               </section>
               <section className="card key-card">
                 <div className="section-heading">
@@ -680,7 +690,16 @@ function App() {
                   and recaps. Your key stays in this browser; our server never
                   sees it.
                 </p>
-                <button
+                <label>AI provider
+                  <select aria-label="AI provider" disabled={!!busy} value={provider} onChange={e => {
+                    const next = e.target.value as "openrouter" | "gemini";
+                    setProvider(next); setKey(readKey(next)); setKeyStatus("");
+                    setRemember(!!localStorage.getItem(next === "gemini" ? "atlas-gemini-key" : "atlas-key"));
+                    setModel(next === "gemini" ? GEMINI_MODELS[0] : "openrouter/free");
+                  }}><option value="openrouter">OpenRouter · free models</option><option value="gemini">Gemini · free tier</option></select>
+                </label>
+                {provider === "gemini" && <p className="muted">Use a <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">Google AI Studio key</a> from a project without paid billing enabled to stay free. Quotas apply; we cannot detect billing status. Free-tier prompts may be used by Google to improve its products.</p>}
+                {provider === "openrouter" && <button
                   className="primary full"
                   onClick={async () => {
                     location.href = await authorize(
@@ -689,14 +708,14 @@ function App() {
                   }}
                 >
                   Sign in with OpenRouter <ArrowUpRight size={15} />
-                </button>
+                </button>}
                 <details>
-                  <summary>Or paste an API key</summary>
+                  <summary>{provider === "gemini" ? "Paste a Gemini API key" : "Or paste an API key"}</summary>
                   <input
                     type="password"
                     autoComplete="off"
-                    aria-label="OpenRouter API key"
-                    placeholder="sk-or-…"
+                    aria-label={provider === "gemini" ? "Gemini API key" : "OpenRouter API key"}
+                    placeholder={provider === "gemini" ? "AIza…" : "sk-or-…"}
                     value={key}
                     onChange={(e) => setKey(e.target.value)}
                   />
@@ -709,7 +728,7 @@ function App() {
                     onChange={(e) => {
                       setRemember(e.target.checked);
                       if (keyStatus.startsWith("Connected"))
-                        saveKey(key, e.target.checked);
+                        saveKey(key, e.target.checked, provider);
                     }}
                   />{" "}
                   Remember on this device
@@ -717,7 +736,7 @@ function App() {
                 <button
                   className="text-button"
                   onClick={() => {
-                    saveKey("");
+                    saveKey("", false, provider);
                     setKey("");
                     setKeyStatus("Key forgotten");
                   }}
@@ -733,7 +752,7 @@ function App() {
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                   >
-                    {[...new Set([model, ...models])].map((m) => (
+                    {[...new Set(provider === "gemini" ? GEMINI_MODELS : [model, ...models])].map((m) => (
                       <option key={m}>{m}</option>
                     ))}
                   </select>

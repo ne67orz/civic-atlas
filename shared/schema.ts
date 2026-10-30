@@ -88,7 +88,7 @@ export const InputSchema = z
     "Candidate names must be distinct",
   )
   .refine(
-    (x) => !JSON.stringify(x).includes("sk-or-"),
+    (x) => !/sk-or-|AIza[\w-]{20,}/.test(JSON.stringify(x)),
     "Credential-like text cannot be included in a scenario",
   );
 export type Input = z.infer<typeof InputSchema>;

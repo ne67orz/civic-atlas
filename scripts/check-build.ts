@@ -4,6 +4,9 @@ const headers = await readFile("dist/_headers", "utf8");
 for (const expected of [
   "default-src 'self'",
   "connect-src 'self' https://openrouter.ai",
+  "https://generativelanguage.googleapis.com",
+  "https://www.wikidata.org",
+  "https://en.wikipedia.org",
   "script-src 'self' https://challenges.cloudflare.com",
   "frame-src https://challenges.cloudflare.com",
 ])

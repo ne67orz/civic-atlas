@@ -8,6 +8,7 @@ import {
   type County,
   type Profile,
 } from "../shared/schema";
+import { geminiCompletion } from "./gemini";
 import { completion, MOCK, redact } from "./openrouter";
 import {
   facts,
@@ -17,6 +18,7 @@ import {
 } from "../shared/narrative";
 self.onmessage = async ({ data }) => {
   try {
+    const complete = data.provider === "gemini" ? geminiCompletion : completion;
     if (data.type === "profiles") {
       const budget = { calls: 0, max: 8 };
       const profiles: Profile[] = [];
@@ -47,7 +49,7 @@ self.onmessage = async ({ data }) => {
           isPublicPersona: !!item.signals?.persona,
           lookupStatus: String(item.signals?.statuses?.wikipedia || "Live identity lookup was not run.").slice(0, 500),
           politicalSummary: !unknown && !data.key && item.signals?.politicalEvidence
-            ? "Public sources were retrieved. Connect OpenRouter and generate profiles again to summarize political ideals. Slider values have not yet been estimated."
+            ? "Public sources were retrieved. Connect your AI provider and generate profiles again to summarize political ideals. Slider values have not yet been estimated."
             : "Political positions have not been established from retrieved evidence. Slider values are simulation assumptions.",
           politicalConfidence: "low",
           sources: item.signals?.sources || [],
@@ -58,7 +60,7 @@ self.onmessage = async ({ data }) => {
         const profile =
           MOCK || unknown || !data.key
             ? base
-            : await completion(
+            : await complete(
                 data.key,
                 data.models,
                 "Write a neutral profile of the identified adult public figure or public persona solely from supplied evidence. For fictional personas, discuss only fictional/canonical positions and clearly label them; never attribute a persona’s views to its performer. No invented quotes, misconduct, scandals, private details, hateful or sexual content. Use the provided JSON keys exactly; ideology has four values in [-1,1], appeal values in [-1,1], recognition and controversy in [0,1], favorability in [-1,1]. Keep name and party unchanged; party is the user’s scenario choice, not evidence of actual beliefs. politicalSummary must describe documented political ideals and positions with source URLs from the supplied sources, noting dates, changes, conflicts and gaps; maximum 2400 characters. politicalConfidence is low, medium or high based on the available political evidence, not fame. Do not infer politics from occupation, identity, religion, popularity, headlines or social posts. Use politicalEvidence as the main basis. Ideology axes in order: economic left (-1) to right (+1), socially progressive (-1) to conservative (+1), establishment (-1) to populist (+1), dovish (-1) to hawkish (+1). Read the supplied Wikipedia biography and political passages, synthesize a clear conclusion about the candidate’s political outlook, and explain which documented positions support your assessment. You may draw reasonable, explicitly labeled inferences from those positions rather than only copying ideology labels. Explain these numeric estimates as simulation assumptions; use 0 for unsupported axes. If no relevant evidence exists, say political views are unknown, set all ideology axes to 0 and politicalConfidence to low. Do not invent policy positions or treat model memory as retrieved evidence.",
@@ -118,7 +120,7 @@ self.onmessage = async ({ data }) => {
         try {
           const evidence = facts(input, result),
             budget = { calls: 0, max: Math.min(2, data.remainingCalls ?? 2) };
-          const n = await completion(
+          const n = await complete(
             data.key,
             data.models,
             "Write a neutral election-night recap and up to ten state blurbs as JSON {recap:string,states:[{state:string,text:string}]}. Recap must contain no numeric figures. Use only supplied facts, no new claims. Every state blurb may use only numbers supplied for that state.",

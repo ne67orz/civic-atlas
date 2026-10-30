@@ -1,20 +1,22 @@
 import { z } from "zod";
 export const ORIGIN = "https://openrouter.ai";
 export const MOCK = typeof __MOCK_LLM__ !== "undefined" && __MOCK_LLM__;
-export function saveKey(key: string, remember = false) {
-  sessionStorage.removeItem("atlas-key");
-  localStorage.removeItem("atlas-key");
-  if (key) (remember ? localStorage : sessionStorage).setItem("atlas-key", key);
+export function saveKey(key: string, remember = false, provider = "openrouter") {
+  const slot = provider === "gemini" ? "atlas-gemini-key" : "atlas-key";
+  sessionStorage.removeItem(slot);
+  localStorage.removeItem(slot);
+  if (key) (remember ? localStorage : sessionStorage).setItem(slot, key);
 }
-export function readKey() {
+export function readKey(provider = "openrouter") {
+  const slot = provider === "gemini" ? "atlas-gemini-key" : "atlas-key";
   return (
-    sessionStorage.getItem("atlas-key") ||
-    localStorage.getItem("atlas-key") ||
+    sessionStorage.getItem(slot) ||
+    localStorage.getItem(slot) ||
     ""
   );
 }
 export function redact(s: string) {
-  return s.replace(/sk-or-[A-Za-z0-9_-]+/g, "[redacted]");
+  return s.replace(/sk-or-[A-Za-z0-9_-]+|AIza[A-Za-z0-9_-]+/g, "[redacted]");
 }
 const b64 = (a: Uint8Array) =>
   btoa(String.fromCharCode(...a))
